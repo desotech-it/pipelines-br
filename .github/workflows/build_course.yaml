@@ -1,0 +1,186 @@
+name: Build Course
+on:
+  workflow_dispatch:
+    inputs:
+      course_code:
+        description: Code of the course to build
+        required: true
+        type: string
+      course_description:
+        description: Description of the course to build
+        required: true
+        type: string
+
+concurrency: dscourses-writer
+
+jobs:
+  build_course:
+    runs-on: ubuntu-latest
+    steps:
+      - id: course-code
+        run: course_code=${{ inputs.course_code }} ; echo lowercase=${course_code,,} >> "$GITHUB_OUTPUT"
+
+      - name: Checkout ${{ github.repository }} repository
+        uses: actions/checkout@v5
+
+      - name: Get active branch
+        id: active-branch
+        run: |
+          course_code="${{ steps.course-code.outputs.lowercase }}"
+          echo active-branch="$(jq -r "if has(\"$course_code\") then .$course_code else \"\" end" ./branches.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout ${{ github.repository_owner }}/${{ inputs.course_code }} repository
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/${{ inputs.course_code }}
+          path: docs
+          ref: ${{ steps.active-branch.outputs.active-branch }}
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Checkout ${{ github.repository_owner }}/dscourses repository
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/dscourses
+          path: dscourses
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Get current year
+        id: current-year
+        run: echo "current-year=$(date +%Y)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate PDF name
+        id: pdf-name
+        run: |
+          shopt -s extglob
+          result='${{ inputs.course_description }}' ; result="${result,,}" ; echo result="${result//+([[:space:]])/-}.pdf" >> "$GITHUB_OUTPUT"
+
+      - name: Generate MkDocs Configuration
+        run: |
+          cat > mkdocs.yml <<EOF
+          site_name: '${{ inputs.course_code }}'
+          site_url: https://www.deso.tech
+          site_description: '${{ inputs.course_description }}'
+          site_author: Desotech TM
+          copyright: Copyright &copy; 2016 - ${{ steps.current-year.outputs.current-year }} Desotech
+          use_directory_urls: false
+          theme:
+            name: null
+            custom_dir: material
+            highlightjs: true
+            hljs_languages:
+              - yaml
+            features:
+              - header.autohide
+              - toc.integrate
+            include_sidebar: true
+            static_templates:
+              - 404.html
+            include_search_page: false
+            search_index_only: true
+            language: en
+            feature:
+              tabs: false
+            palette:
+              primary: grey
+              accent: grey
+            font:
+              text: Roboto
+              code: Roboto Mono
+            favicon: assets/favicon.ico
+            logo: assets/desotech-cubo-small.png
+          markdown_extensions:
+            - admonition
+            - abbr
+            - attr_list
+            - def_list
+            - footnotes
+            - meta
+            - toc:
+                permalink: true
+            - pymdownx.arithmatex:
+                generic: true
+            - pymdownx.betterem:
+                smart_enable: all
+            - pymdownx.caret
+            - pymdownx.critic
+            - pymdownx.details
+            - pymdownx.emoji:
+                emoji_index: !!python/name:material.extensions.emoji.twemoji
+                emoji_generator: !!python/name:material.extensions.emoji.to_svg
+            - pymdownx.highlight
+            - pymdownx.inlinehilite
+            - pymdownx.keys
+            - pymdownx.mark
+            - pymdownx.smartsymbols
+            - pymdownx.snippets:
+                check_paths: true
+            - pymdownx.superfences:
+                custom_fences:
+                  - name: mermaid
+                    class: mermaid
+                    format: !!python/name:pymdownx.superfences.fence_code_format
+            - pymdownx.tabbed
+            - pymdownx.tasklist:
+                custom_checkbox: true
+            - pymdownx.tilde
+          plugins:
+            - minify:
+                minify_html: false
+            - codeinclude
+            - awesome-pages
+            - img2fig
+            - exclude:
+                glob:
+                  - mkdocs.yml
+                  - '*.incomplete'
+                  - 'drafts/*'
+            - with-pdf:
+                author: Desotech srl
+                copyright: ${{ steps.year.outputs.year }} Desotech srl or its affiliates. All rights reserved.
+                cover_logo: assets/logopdf.png
+                cover: true
+                back_cover: true
+                cover_subtitle: '${{ inputs.course_description }}'
+                ordered_chapter_level: 2
+                render_js: true
+                headless_chrome_path: chrome
+                output_path: 'pdf/${{ steps.pdf-name.outputs.result }}'
+                debug_html: false
+                show_anchors: false
+                verbose: true
+                timeout: 300
+          EOF
+
+      - name: Set Up Chromium
+        uses: browser-actions/setup-chrome@latest
+
+      - name: Install Python Dependencies
+        run: |
+          set -eu
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+
+      - name: Link assets folder
+        run: ln -fs ../assets docs/assets
+
+      - name: Build Site
+        run: mkdocs build
+
+      - name: Add Favicon
+        run: cp -- favicon.ico site/favicon.ico
+
+      - name: Copy Output Files
+        run: rsync -r --exclude password.txt --exclude .htpasswd --delete site/  dscourses/${{ steps.course-code.outputs.lowercase }}
+
+      - name: Push Changes
+        run: |
+          git -C dscourses config --local user.name 'GitHub Actions'
+          git -C dscourses config --local user.email actions@desotech.it
+          git -C dscourses add -A
+          if git -C dscourses commit -m 'Update ${{ inputs.course_code }}'
+          then
+            retries=0
+            until git -C dscourses push || [ "$retries" -gt 10 ] ; do sleep 5 ; git -C dscourses pull --rebase ; ((retries++)) ; done
+          else
+            echo 'Nothing to commit. The site is already up-to-date.'
+          fi

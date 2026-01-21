@@ -1,0 +1,9 @@
+mkdocs
+mkdocs-minify-plugin
+mkdocs-codeinclude-plugin
+mkdocs-awesome-pages-plugin
+mkdocs-img2fig-plugin
+mkdocs-exclude
+mkdocs-material
+mkdocs-with-pdf
+qrcode
