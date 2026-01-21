@@ -21,7 +21,7 @@ jobs:
         run: course_code=${{ inputs.course_code }} ; echo lowercase=${course_code,,} >> "$GITHUB_OUTPUT"
 
       - name: Checkout ${{ github.repository }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Get active branch
         id: active-branch
@@ -30,7 +30,7 @@ jobs:
           echo active-branch="$(jq -r "if has(\"$course_code\") then .$course_code else \"\" end" ./branches.json)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout ${{ github.repository_owner }}/${{ inputs.course_code }} repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ github.repository_owner }}/${{ inputs.course_code }}
           path: docs
@@ -38,7 +38,7 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
 
       - name: Checkout ${{ github.repository_owner }}/dscourses repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ${{ github.repository_owner }}/dscourses
           path: dscourses
