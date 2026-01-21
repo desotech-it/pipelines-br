@@ -58,10 +58,10 @@ jobs:
         run: |
           cat > mkdocs.yml <<EOF
           site_name: '${{ inputs.course_code }}'
-          site_url: https://www.deso.tech
+          site_url: https://www.broadcom.com/
           site_description: '${{ inputs.course_description }}'
-          site_author: Desotech TM
-          copyright: Copyright &copy; 2016 - ${{ steps.current-year.outputs.current-year }} Desotech
+          site_author: Desolabs TM
+          copyright: Copyright &copy; 2016 - ${{ steps.current-year.outputs.current-year }} Desolabs
           use_directory_urls: false
           theme:
             name: null
@@ -87,7 +87,7 @@ jobs:
               text: Roboto
               code: Roboto Mono
             favicon: assets/favicon.ico
-            logo: assets/desotech-cubo-small.png
+            logo: assets/desolabs-cubo-small.png
           markdown_extensions:
             - admonition
             - abbr
@@ -135,8 +135,8 @@ jobs:
                   - '*.incomplete'
                   - 'drafts/*'
             - with-pdf:
-                author: Desotech srl
-                copyright: ${{ steps.year.outputs.year }} Desotech srl or its affiliates. All rights reserved.
+                author: Desolabs srl
+                copyright: ${{ steps.year.outputs.year }} Desolabs srl or its affiliates. All rights reserved.
                 cover_logo: assets/logopdf.png
                 cover: true
                 back_cover: true
@@ -175,7 +175,7 @@ jobs:
       - name: Push Changes
         run: |
           git -C dscourses config --local user.name 'GitHub Actions'
-          git -C dscourses config --local user.email actions@desotech.it
+          git -C dscourses config --local user.email actions@desolabs.it
           git -C dscourses add -A
           if git -C dscourses commit -m 'Update ${{ inputs.course_code }}'
           then
